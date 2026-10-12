@@ -5,3 +5,7 @@ __pycache__/
 *.csv
 *.bin
 s3.env
+*.duckdb
+*.duckdb.wal
+init.sql
+*.parquet

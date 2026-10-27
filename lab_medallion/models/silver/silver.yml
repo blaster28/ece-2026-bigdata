@@ -7,6 +7,11 @@ models:
         data_tests:
           - unique
           - not_null
+      - name: username_normalized
+        description: Username without leading/trailing whitespace, in lowercase, used to compare usernames case-insensitively.
+        data_tests:
+          - unique
+          - not_null
       - name: email
         data_tests:
           - unique
@@ -33,6 +38,7 @@ models:
           - unique
           - not_null
       - name: user_id
+        description: Identifier of the user who placed the order, must exist in stg_users.
         data_tests:
           - not_null
           - relationships:
@@ -40,13 +46,18 @@ models:
                 to: ref('stg_users')
                 field: user_id
       - name: quantity
+        description: Number of items ordered, strictly positive.
         data_tests:
+          - not_null
+          - positive
           - accepted_values:
               arguments:
                 values: [1, 2, 3, 4, 5]
                 quote: false
       - name: product
+        description: Product ordered, from the closed list of the bakery.
         data_tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ["bread", "brioche", "cookie", "croissant", "donut", "drink"]

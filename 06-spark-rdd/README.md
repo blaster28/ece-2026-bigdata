@@ -42,6 +42,8 @@ Platform: Onyxia `vscode-pyspark`, Spark 4.1.1, Python 3.13, `local[*]` with 2 c
 
 The cache works (Storage tab, second count 2.7x faster than the first), but on a 330 KB file its gain is hidden by the fixed cost of a job (about 0.2 s), and the first run is slower because it stores the partitions. It pays off when the lineage is expensive (large or remote file, heavy parsing) and reused by several actions. The second `user_quantity` count is fast in both cases because the shuffle files of `reduceByKey` are reused, not because of the cache.
 
+A second run of the script (`rdd_lab_output.txt`) gave 0.372 s then 0.339 s with cache and 0.196 s then 0.199 s without: the variation between runs is larger than the effect of the cache at this size, which confirms that the fixed cost of a job dominates.
+
 ## Questions
 
 **What decides the default number of partitions of `textFile()` for a file this size?**

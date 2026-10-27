@@ -1,0 +1,105 @@
+
+=== RDD creation and partitions ===
+  defaultParallelism: 2
+  users / orders partitions: 2 2
+  after repartition(8): 8
+
+=== Lazy evaluation and lineage ===
+(2) PythonRDD[10] at RDD at PythonRDD.scala:58 []
+ |  orders.csv MapPartitionsRDD[3] at textFile at NativeMethodAccessorImpl.java:0 []
+ |  orders.csv HadoopRDD[2] at textFile at NativeMethodAccessorImpl.java:0 []
+  count 1: 2829
+  count 2: 2829
+  stage   0 COMPLETE  tasks=1   input= 262144 shuffleRead=      0 shuffleWrite=      0  runJob at PythonRDD.scala:191
+  stage   1 COMPLETE  tasks=2   input= 427928 shuffleRead=      0 shuffleWrite=      0  count at /home/onyxia/work/ece-2026-bigdata/0
+  stage   2 COMPLETE  tasks=2   input= 427928 shuffleRead=      0 shuffleWrite=      0  count at /home/onyxia/work/ece-2026-bigdata/0
+
+=== The cost of no schema: the multiline address ===
+uuid,username,name,sex,address,mail,birthdate
+bdd640fb-0667-4ad1-9c80-317fa3b1799d,garzaanthony,Charles Garcia,M,"908 Jennifer Squares
+Robinsonshire, KY 01352",helenpeterson@gmail.com,1935-09-30
+  physical lines: 101 | user records: 50
+
+=== Manual parsing of orders ===
+  first order: {'order_id': '2339ba19-2563-4cc3-8a97-ebf555d596af', 'user_id': 'bdd640fb-0667-4ad1-9c80-317fa3b1799d', 'date': '2020-01-01 00:02:17.891488+00:00', 'quantity': 4, 'product': 'drink'}
+
+=== Key-value RDDs: reduceByKey vs groupByKey ===
+  reduceByKey users: 50
+  stage   7 COMPLETE  tasks=2   input= 251866 shuffleRead=      0 shuffleWrite=   2513  reduceByKey at /home/onyxia/work/ece-2026-big
+  stage   8 COMPLETE  tasks=2   input=      0 shuffleRead=   2513 shuffleWrite=      0  collect at /home/onyxia/work/ece-2026-bigdata
+  groupByKey users: 50
+  stage   9 COMPLETE  tasks=2   input= 172051 shuffleRead=      0 shuffleWrite=   6230  groupByKey at /home/onyxia/work/ece-2026-bigd
+  stage  10 COMPLETE  tasks=2   input=      0 shuffleRead=   6230 shuffleWrite=      0  collect at /home/onyxia/work/ece-2026-bigdata
+  same result: True
+
+=== Manual deduplication ===
+  before / after dedup: 2829 2829
+
+=== Joining orders with users ===
+  first enriched row: ('f143262f-dc5c-4eed-8da0-365bf89897b9', ({'order_id': 'f1f7d904-1307-4157-98c1-28e7d6cd3155', 'user_id': 'f143262f-dc5c-4eed-8da0-365bf89897b9', 'date': '2020-01-07 17:49:04.785279+00:00', 'quantity': 1, 'product': 'bread'}, 'kayla51'))
+  enriched rows: 2829
+  stage  19 COMPLETE  tasks=1   input=      0 shuffleRead=  39442 shuffleWrite=      0  runJob at PythonRDD.scala:191
+  stage  20 SKIPPED   tasks=4   input=      0 shuffleRead=      0 shuffleWrite=      0  join at /home/onyxia/work/ece-2026-bigdata/06
+  stage  21 COMPLETE  tasks=4   input=      0 shuffleRead= 182502 shuffleWrite=      0  count at /home/onyxia/work/ece-2026-bigdata/0
+  left rows: 2829 | without user: 0
+
+=== Exercise 1: aggregateByKey ===
+  (order_count, total_quantity): [('f143262f-dc5c-4eed-8da0-365bf89897b9', (4, 12)), ('969b6662-0562-4059-968c-c69b1064005c', (12, 40)), ('ce9e1a11-fcbb-4e59-bbdd-cf7c9c96e9ec', (85, 253))]
+  average quantity per order: [('f143262f-dc5c-4eed-8da0-365bf89897b9', 3.0), ('969b6662-0562-4059-968c-c69b1064005c', 3.33), ('ce9e1a11-fcbb-4e59-bbdd-cf7c9c96e9ec', 2.98)]
+  totals match reduceByKey: True
+  orders counted: 2829
+
+=== Exercise 2: order with an unknown user ===
+  orders: 2830 | orphans: 1
+  orphan: [('ffffffff-ffff-ffff-ffff-ffffffffffff', ({'order_id': '00000000-0000-0000-0000-000000000000', 'user_id': 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'date': '2020-05-01 00:00:00+00:00', 'quantity': 1, 'product': 'bread'}, None))]
+  inner join rows: 2829
+
+=== Exercise 3: the same aggregation with the DataFrame API ===
+root
+ |-- uuid: string (nullable = true)
+ |-- user_id: string (nullable = true)
+ |-- date: timestamp (nullable = true)
+ |-- quantity: integer (nullable = true)
+ |-- product: string (nullable = true)
+
++------------------------------------+-------------+
+|user_id                             |sum(quantity)|
++------------------------------------+-------------+
+|d47d577b-fa5a-41ca-859d-d55d4b943e30|80           |
+|0b2f6d5c-700b-4d5f-b89f-72f32a60c652|190          |
+|d9e604b3-8412-4335-988c-656db61e5fdb|184          |
+|97fa7f04-8363-4007-9cae-9610c72c1fe3|285          |
+|2051acef-097a-4e10-b6fe-bc0e7ecddbaf|301          |
++------------------------------------+-------------+
+only showing top 5 rows
+== Physical Plan ==
+AdaptiveSparkPlan isFinalPlan=false
++- HashAggregate(keys=[user_id#23], functions=[sum(quantity#20)])
+   +- Exchange hashpartitioning(user_id#23, 200), ENSURE_REQUIREMENTS, [plan_id=85]
+      +- HashAggregate(keys=[user_id#23], functions=[partial_sum(quantity#20)])
+         +- Project [user_uuid#18 AS user_id#23, quantity#20]
+            +- FileScan csv [user_uuid#18,quantity#20] Batched: false, DataFilters: [], Format: CSV, Location: InMemoryFileIndex(1 paths)[file:/home/onyxia/work/ece-2026-bigdata/06-spark-rdd/orders.csv], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<user_uuid:string,quantity:int>
+
+
+(2) PythonRDD[22] at collect at /home/onyxia/work/ece-2026-bigdata/06-spark-rdd/rdd_lab.py:93 []
+ |  MapPartitionsRDD[21] at mapPartitions at PythonRDD.scala:170 []
+ |  ShuffledRDD[20] at partitionBy at NativeMethodAccessorImpl.java:0 []
+ +-(2) PairwiseRDD[19] at reduceByKey at /home/onyxia/work/ece-2026-bigdata/06-spark-rdd/rdd_lab.py:92 []
+    |  PythonRDD[18] at reduceByKey at /home/onyxia/work/ece-2026-bigdata/06-spark-rdd/rdd_lab.py:92 []
+    |  PythonRDD[16] at RDD at PythonRDD.scala:58 []
+    |      CachedPartitions: 2; MemorySize: 168.0 KiB; DiskSize: 0.0 B
+    |  orders.csv MapPartitionsRDD[3] at textFile at NativeMethodAccessorImpl.java:0 []
+    |  orders.csv HadoopRDD[2] at textFile at NativeMethodAccessorImpl.java:0 []
+  same result: True
+
+=== Exercise 4: with and without cache ===
+  cache    orders count (1st)          0.372 s  -> 2829
+  cache    orders count (2nd)          0.339 s  -> 2829
+  cache    user_quantity count (1st)   0.509 s  -> 50
+  cache    user_quantity count (2nd)   0.189 s  -> 50
+  Storage tab: [('PythonRDD', 2, 172051)]
+  no cache orders count (1st)          0.196 s  -> 2829
+  no cache orders count (2nd)          0.199 s  -> 2829
+  no cache user_quantity count (1st)   0.308 s  -> 50
+  no cache user_quantity count (2nd)   0.143 s  -> 50
+  Storage tab: empty

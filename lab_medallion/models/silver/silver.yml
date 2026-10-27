@@ -12,6 +12,16 @@ models:
         data_tests:
           - unique
           - not_null
+      - name: birthdate
+        description: Date of birth, NULL when the raw value is later than the first order of the user.
+      - name: birthdate_is_valid
+        description: True when the raw birthdate is not after the first order of the user.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
       - name: email
         data_tests:
           - unique

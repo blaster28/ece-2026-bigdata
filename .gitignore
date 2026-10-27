@@ -9,3 +9,6 @@ s3.env
 *.duckdb.wal
 init.sql
 *.parquet
+target/
+dbt_packages/
+logs/

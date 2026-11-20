@@ -13,3 +13,4 @@ target/
 dbt_packages/
 logs/
 !lab_medallion/seeds/*.csv
+09-polaris/polaris/deployment/charts/

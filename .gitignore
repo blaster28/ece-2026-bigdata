@@ -14,3 +14,4 @@ dbt_packages/
 logs/
 !lab_medallion/seeds/*.csv
 09-polaris/polaris/deployment/charts/
+10-trino/trino/deployment/charts/
